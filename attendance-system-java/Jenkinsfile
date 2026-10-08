@@ -1,0 +1,47 @@
+// Jenkins pipeline. The Jenkins agent needs JDK 17+ and Docker installed.
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = 'attendance-system-java'
+        IMAGE_TAG  = "${env.BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps { checkout scm }
+        }
+
+        stage('Build & Test') {
+            steps { sh 'bash test.sh' }
+        }
+
+        stage('Build Image') {
+            steps {
+                sh 'docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:latest .'
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh '''
+                    docker rm -f attendance-system-java || true
+                    docker run -d --name attendance-system-java -p 8080:8080 \
+                        -v attendance-data:/data ${IMAGE_NAME}:${IMAGE_TAG}
+                '''
+            }
+        }
+
+        stage('Smoke Test') {
+            steps {
+                sh '''
+                    for i in $(seq 1 20); do
+                        curl -fs http://localhost:8080/health && exit 0
+                        sleep 2
+                    done
+                    exit 1
+                '''
+            }
+        }
+    }
+}
