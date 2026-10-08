@@ -1,47 +1,47 @@
-// Jenkins pipeline. The Jenkins agent needs JDK 17+ and Docker installed.
 pipeline {
     agent any
 
-    environment {
-        IMAGE_NAME = 'attendance-system-java'
-        IMAGE_TAG  = "${env.BUILD_NUMBER}"
-    }
-
     stages {
+
         stage('Checkout') {
-            steps { checkout scm }
+            steps {
+                checkout scm
+            }
         }
 
         stage('Build & Test') {
-            steps { sh 'bash test.sh' }
-        }
-
-        stage('Build Image') {
             steps {
-                sh 'docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -t ${IMAGE_NAME}:latest .'
+                bat 'test.bat'
             }
         }
 
         stage('Deploy') {
             steps {
-                sh '''
-                    docker rm -f attendance-system-java || true
-                    docker run -d --name attendance-system-java -p 8080:8080 \
-                        -v attendance-data:/data ${IMAGE_NAME}:${IMAGE_TAG}
+                bat '''
+                    taskkill /F /IM java.exe >nul 2>&1 || exit /b 0
+                    set PORT=8082
+                    set DATA_DIR=data
+                    start "AttendanceSystem" /B java -jar out\\attendance.jar
                 '''
             }
         }
 
         stage('Smoke Test') {
             steps {
-                sh '''
-                    for i in $(seq 1 20); do
-                        curl -fs http://localhost:8080/health && exit 0
-                        sleep 2
-                    done
-                    exit 1
+                bat '''
+                    powershell -Command "for ($i=0; $i -lt 20; $i++) { try { $r=Invoke-WebRequest http://localhost:8082/health -UseBasicParsing; if ($r.StatusCode -eq 200) { exit 0 } } catch {} ; Start-Sleep -Seconds 2 }; exit 1"
                 '''
             }
+        }
+    }
+
+    post {
+        success {
+            echo 'Attendance System deployed successfully!'
+        }
+
+        failure {
+            echo 'Build/Test/Deployment failed.'
         }
     }
 }
