@@ -26,13 +26,16 @@ pipeline {
             }
         }
 
-        stage('Smoke Test') {
-            steps {
-                bat '''
-                    powershell -Command "for ($i=0; $i -lt 20; $i++) { try { $r=Invoke-WebRequest http://localhost:8082/health -UseBasicParsing; if ($r.StatusCode -eq 200) { exit 0 } } catch {} ; Start-Sleep -Seconds 2 }; exit 1"
-                '''
-            }
-        }
+        stage('Deploy') {
+    steps {
+        bat '''
+            powershell -Command "$p = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*attendance.jar*' -and $_.Name -eq 'java.exe' }; if ($p) { $p | ForEach-Object { Stop-Process -Id $_.ProcessId -Force } }"
+            set PORT=8082
+            set DATA_DIR=data
+            start "AttendanceSystem" /B java -jar out\\attendance.jar
+        '''
+    }
+}
     }
 
     post {
