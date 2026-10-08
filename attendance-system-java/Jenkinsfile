@@ -18,20 +18,16 @@ pipeline {
         }
 
         stage('Deploy') {
-            steps {
-                dir('attendance-system-java') {
-                    bat '''
-                        powershell -Command "$p = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'java.exe' -and $_.CommandLine -like '*attendance.jar*' }; if ($p) { $p | ForEach-Object { Stop-Process -Id $_.ProcessId -Force } }"
+    steps {
+        dir('attendance-system-java') {
+            bat '''
+                powershell -Command "$p = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'java.exe' -and $_.CommandLine -like '*attendance.jar*' }; if ($p) { $p | ForEach-Object { Stop-Process -Id $_.ProcessId -Force } }"
 
-                        set PORT=8082
-                        set DATA_DIR=data
-
-                        start "AttendanceSystem" /B java -jar out\\attendance.jar
-                    '''
-                }
-            }
+                powershell -Command "$env:PORT='8082'; $env:DATA_DIR='data'; $env:JENKINS_NODE_COOKIE='dontKillMe'; Start-Process -FilePath 'java.exe' -ArgumentList '-jar','out\\attendance.jar' -WorkingDirectory (Get-Location) -WindowStyle Hidden"
+            '''
         }
-
+    }
+}
         stage('Smoke Test') {
             steps {
                 bat '''
